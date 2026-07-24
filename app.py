@@ -120,21 +120,20 @@ food_master = {
     "Beans": ["Tbsp", 100, 1.13, 0.024, 0.052, 0.139, 0.00, 0.006, 0.003, 0.007, 0.006],
 }
 
-# --- CUSTOM CSS FOR MOBILE DESIGN ---
+# --- STYLING ---
 st.markdown("""
     <style>
-    .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; background-color: #007bff; color: white; font-weight: bold; }
-    .report-card { background: #ffffff; padding: 15px; border-radius: 10px; border-top: 5px solid #007bff; margin-bottom: 10px; border: 1px solid #ddd; }
-    .bmi-meter { width: 100%; height: 25px; border-radius: 15px; background: linear-gradient(to right, #5bc0de, #5cb85c, #f0ad4e, #d9534f); position: relative; margin: 20px 0; }
+    .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; background-color: #28a745; color: white; font-weight: bold; }
+    .report-card { background: #ffffff; padding: 20px; border-radius: 10px; border-top: 5px solid #28a745; border: 1px solid #ddd; margin-bottom: 20px; }
+    .bmi-meter { width: 100%; height: 25px; border-radius: 15px; background: linear-gradient(to right, #5bc0de 0%, #5bc0de 46%, #5cb85c 46%, #5cb85c 58%, #f0ad4e 58%, #f0ad4e 68%, #d9534f 68%, #d9534f 100%); position: relative; margin: 20px 0; }
     .bmi-pointer { position: absolute; top: -8px; width: 6px; height: 40px; background: #000; border-radius: 3px; border: 2px solid white; }
-    .food-box { border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-bottom: 5px; background: #fafafa; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏥 Clinical Nutrition Tool")
+st.title("🥗 Clinical Nutrition & IPAQ Auditor")
 
-# --- 1. PATIENT PROFILE (Ab Main Page par hai) ---
-st.header("👤 Patient Identification")
+# --- 1. PATIENT PROFILE ---
+st.header("📋 Patient Information")
 c1, c2 = st.columns(2)
 with c1:
     cr_no = st.text_input("CR Number (UHID)")
@@ -144,53 +143,44 @@ with c2:
     age = st.number_input("Age (Years)", 1, 100, 35)
 
 c3, c4, c5 = st.columns(3)
-with c3:
-    height = st.number_input("Height (cm)", 100.0, 220.0, 165.0)
-with c4:
-    weight = st.number_input("Weight (kg)", 10.0, 200.0, 65.0)
-with c5:
-    gender = st.selectbox("Gender", ["Male", "Female"])
+with c3: height = st.number_input("Height (cm)", 100.0, 220.0, 165.0)
+with c4: weight = st.number_input("Weight (kg)", 10.0, 200.0, 60.0)
+with c5: gender = st.selectbox("Gender", ["Male", "Female"])
 
-# --- 2. IPAQ PHYSICAL ACTIVITY ---
+# --- 2. IPAQ ---
 st.markdown("---")
-st.header("🏃 Physical Activity (IPAQ)")
-st.caption("Answer these 7 questions to set accuracy.")
-
+st.header("🚶 Physical Activity (IPAQ)")
 col_i1, col_i2 = st.columns(2)
 with col_i1:
-    v_days = st.number_input("Vigorous days/week", 0, 7, 0)
-    v_mins = st.number_input("Vigorous mins/day", 0, 480, 0)
-    m_days = st.number_input("Moderate days/week", 0, 7, 0)
-    m_mins = st.number_input("Moderate mins/day", 0, 480, 0)
+    v_days = st.number_input("Vigorous activity days/week", 0, 7)
+    v_mins = st.number_input("Vigorous mins/day", 0, 480)
+    m_days = st.number_input("Moderate activity days/week", 0, 7)
+    m_mins = st.number_input("Moderate mins/day", 0, 480)
 with col_i2:
-    w_days = st.number_input("Walking days/week", 0, 7, 0)
-    w_mins = st.number_input("Walking mins/day", 0, 480, 0)
-    s_mins = st.number_input("Sitting mins/weekday", 0, 1440, 300)
+    w_days = st.number_input("Walking days/week", 0, 7)
+    w_mins = st.number_input("Walking mins/day", 0, 480)
+    s_mins = st.number_input("Sitting mins/day", 0, 1440, 300)
 
-# MET Calculation
 met_score = (v_days * v_mins * 8.0) + (m_days * m_mins * 4.0) + (w_days * w_mins * 3.3)
 pal = 1.75 if met_score >= 3000 else (1.5 if met_score >= 600 else 1.2)
 
 # --- 3. FFQ DIET RECALL ---
 st.markdown("---")
-st.header("🥗 Daily Food Recall (FFQ)")
-st.info("Fill frequency and portion for items consumed.")
-
+st.header("🥣 24h Diet Recall (FFQ)")
 ffq_inputs = {}
 for food, meta in food_master.items():
     with st.expander(f"🍴 {food} ({meta[0]})"):
-        f_c1, f_c2, f_c3 = st.columns([1, 1, 1])
-        fv = f_c1.number_input("Freq", 0.0, 100.0, 0.0, key=f"f_{food}")
-        fp = f_c2.selectbox("Per", ["Day", "Week", "Month", "Never"], key=f"p_{food}")
-        fq = f_c3.number_input("Qty", 0.0, 20.0, 1.0, key=f"q_{food}")
+        f1, f2, f3 = st.columns(3)
+        fv = f1.number_input("Frequency", 0.0, 100.0, 0.0, key=f"f_{food}")
+        fp = f2.selectbox("Period", ["Day", "Week", "Month", "Never"], key=f"p_{food}")
+        fq = f3.number_input("Portion", 0.0, 50.0, 1.0, key=f"q_{food}")
         ffq_inputs[food] = {"f": fv, "p": fp, "q": fq}
 
-# --- 4. CALCULATION & DESIGNED RESULTS ---
-st.markdown("---")
-if st.button("📊 GENERATE FINAL CLINICAL REPORT"):
+# --- 4. CALCULATION & ACCURATE ICMR RESULTS ---
+if st.button("📊 GENERATE FINAL REPORT"):
     bmi_val = round(weight / ((height/100)**2), 1)
     
-    # Calculate Intake (Arjun Bhagat Data)
+    # CALCULATE ACTUAL INTAKE
     total_in = [0.0] * 9
     for item, data in ffq_inputs.items():
         if data["p"] == "Never" or data["f"] == 0: continue
@@ -198,48 +188,62 @@ if st.button("📊 GENERATE FINAL CLINICAL REPORT"):
         daily_g = data["f"] * mult * data["q"] * food_master[item][1]
         for i in range(9): total_in[i] += daily_g * food_master[item][i+2]
 
-    # ICMR Requirements (Dynamic Accuracy)
-    bmr = (10 * weight) + (6.25 * height) - (5 * age) + (5 if gender == "Male" else -161)
-    e_req = round(bmr * pal)
-    # ICMR Logic: Protein 0.9g/kg, Fats 25%, Carbs 60%, Fibre 30g
-    reqs = [e_req, round(weight*0.9), round((e_req*0.25)/9), round((e_req*0.6)/4), 200, 30, round(e_req*0.08/9), round(e_req*0.12/9), round(e_req*0.08/9)]
+    # --- DYNAMIC CLINICAL REQUIREMENT LOGIC ---
+    if bmi_val < 18.5:
+        # Underweight logic: 30-40 kcal/kg (Taking 35 as average)
+        e_req = round(weight * 35)
+        logic_used = "Underweight Correction (35 kcal/kg)"
+    elif bmi_val >= 25.0:
+        # Obese logic: 20-22 kcal/kg (Taking 21 as average)
+        e_req = round(weight * 21)
+        logic_used = "Obesity Correction (21 kcal/kg)"
+    elif bmi_val >= 23.0:
+        # Overweight logic: 23 kcal/kg
+        e_req = round(weight * 23)
+        logic_used = "Overweight Correction (23 kcal/kg)"
+    else:
+        # Normal BMI logic: BMR * PAL
+        bmr = (10 * weight) + (6.25 * height) - (5 * age) + (5 if gender == "Male" else -161)
+        e_req = round(bmr * pal)
+        logic_used = f"Standard BMR Formula (PAL: {pal})"
+
+    # Macros: Protein 0.9g/kg, Fats 25%, Carbs 60%
+    p_req = round(weight * 0.9)
+    f_req = round((e_req * 0.25) / 9)
+    c_req = round((e_req * 0.60) / 4)
+    
+    req_list = [e_req, p_req, f_req, c_req, 200, 30, round(e_req*0.08/9), round(e_req*0.12/9), round(e_req*0.08/9)]
     labels = ["Energy (kcal)", "Protein (g)", "Fats (g)", "Carbs (g)", "Chol (mg)", "Fibre (g)", "SFA (g)", "MUFA (g)", "PUFA (g)"]
 
-    # BMI Meter Design
-    st.subheader("⚖️ BMI & Clinical Status")
-    p_pos = min(max((bmi_val - 10) / (40 - 10) * 100, 0), 100) # Pointer position
+    # --- UI DISPLAY ---
+    st.divider()
+    st.subheader("⚖️ BMI & Clinical Assessment")
+    # Mapping BMI to Gauge (Range 10-40)
+    p_pos = min(max((bmi_val - 10) / (40 - 10) * 100, 0), 100)
     st.markdown(f"""
         <div class="bmi-meter"><div class="bmi-pointer" style="left: {p_pos}%;"></div></div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.7em; color: #666;">
-            <span>Underweight</span><span>Normal</span><span>Overweight</span><span>Obese</span>
+        <div class="report-card">
+            <h2 style="text-align:center; color:#28a745; margin:0;">{bmi_val}</h2>
+            <p style="text-align:center;"><b>Status:</b> {('Underweight' if bmi_val < 18.5 else 'Healthy' if bmi_val < 23 else 'Overweight/Obese')}</p>
         </div>
         <div class="report-card">
-            <h2 style="text-align:center; color:#007bff; margin:0;">{bmi_val}</h2>
-            <p style="text-align:center; margin:0;"><b>Status:</b> {"Healthy" if 18.5 < bmi_val < 23 else "Clinical Review Needed"}</p>
+            <h4>Diagnostic Summary</h4>
+            <p><b>Energy Requirement Logic:</b> {logic_used}</p>
+            <p><b>Target Daily Intake:</b> {e_req} kcal</p>
+            <p><b>Activity Score:</b> {int(met_score)} MET-min/week</p>
         </div>
     """, unsafe_allow_html=True)
 
-    # Health Summary
-    st.markdown(f"""
-        <div class="report-card">
-            <h4>Clinical Summary</h4>
-            <p><b>Total Activity:</b> {int(met_score)} MET-min/week ({'Active' if pal==1.75 else 'Moderate' if pal==1.5 else 'Sedentary'})</p>
-            <p><b>Daily Calorie Goal:</b> {e_req} kcal</p>
-            <p><b>Protein Goal:</b> {round(weight*0.9)} g</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Detailed Table
-    st.subheader("🧪 ICMR vs Actual Intake")
+    # Table
     res_df = pd.DataFrame({
         "Nutrient": labels,
-        "Requirement (R)": reqs,
+        "Requirement (R)": req_list,
         "Intake (In)": [round(x, 1) for x in total_in]
     })
     res_df["Difference"] = res_df["Intake (In)"] - res_df["Requirement (R)"]
     st.table(res_df)
 
-    # Excel Export
-    db_entry = {"CR": cr_no, "Name": p_name, "BMI": bmi_val, "MET": int(met_score)}
+    # Export
+    db_entry = {"CR": cr_no, "Name": p_name, "BMI": bmi_val, "MET": int(met_score), "Logic": logic_used}
     for i, l in enumerate(labels): db_entry[l] = round(total_in[i], 1)
-    st.download_button("💾 Download Patient Excel Record", pd.DataFrame([db_entry]).to_csv(index=False), f"Patient_{cr_no}.csv")
+    st.download_button("💾 Save to Excel", pd.DataFrame([db_entry]).to_csv(index=False), f"{cr_no}_Report.csv")
