@@ -1,7 +1,13 @@
 import streamlit as st
 import pandas as pd
-from fpdf import FPDF
 from datetime import datetime
+
+# PDF library import with error handling
+try:
+    from fpdf import FPDF
+except ImportError:
+    # Agar library install nahi hui to app crash nahi hoga
+    st.error("PDF Library (fpdf2) not found. Please check requirements.txt")
 
 # --- FULL FOOD LIST (All 143+ items from your image) ---
 # [Unit, GramsPerUnit, Energy, Protein, Fat, Carbs, Chol, Fibre, SFA, MUFA, PUFA]
