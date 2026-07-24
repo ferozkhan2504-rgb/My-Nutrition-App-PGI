@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 from datetime import datetime
 
 # --- FULL FOOD & LIQUID DATABASE (143+ Items) ---
@@ -120,98 +121,118 @@ food_master = {
     "Beans": ["Tbsp", 100, 1.13, 0.024, 0.052, 0.139, 0.00, 0.006, 0.003, 0.007, 0.006],
 }
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="PGI Nutrition Tool", layout="wide")
+# --- GAUGE CHART FOR BMI (Asian-Indian Standards) ---
+def draw_bmi_gauge(bmi):
+    if bmi < 18.5: status, color, risk = "Underweight", "#5bc0de", "Malnutrition Risk"
+    elif 18.5 <= bmi <= 22.9: status, color, risk = "Normal", "#5cb85c", "Low Risk"
+    elif 23.0 <= bmi <= 27.4: status, color, risk = "Overweight", "#f0ad4e", "Moderate Risk"
+    else: status, color, risk = "Obese", "#d9534f", "High Health Risk"
 
-# --- UI SETUP ---
-st.title("🏥 Patient Nutrition & IPAQ Assessment")
-st.caption("Simplified version without PDF library dependencies.")
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number", value = bmi,
+        title = {'text': f"BMI Status: {status}<br><span style='font-size:0.8em;color:gray'>{risk}</span>"},
+        gauge = {
+            'axis': {'range': [None, 40]},
+            'bar': {'color': color},
+            'steps': [
+                {'range': [0, 18.5], 'color': "#eeeeee"},
+                {'range': [18.5, 23], 'color': "#c2f0c2"},
+                {'range': [23, 27.5], 'color': "#ffe0b3"},
+                {'range': [27.5, 40], 'color': "#ffcccc"}]
+        }
+    ))
+    fig.update_layout(height=300)
+    return fig, risk
 
-# 1. Demographics
-with st.expander("👤 Patient Details", expanded=True):
-    c1, c2, c3, c4 = st.columns(4)
-    cr_no = c1.text_input("CR Number")
-    p_name = c2.text_input("Name")
-    mobile = c3.text_input("Mobile")
-    age = c4.number_input("Age", 1, 100, 30)
-    
-    c5, c6, c7 = st.columns(3)
-    ht = c5.number_input("Height (cm)", 100.0, 220.0, 165.0)
-    wt = c6.number_input("Weight (kg)", 10.0, 200.0, 60.0)
-    gender = c7.selectbox("Gender", ["Male", "Female"])
+st.set_page_config(page_title="ICMR Clinical Nutrition Pro", layout="wide")
 
-# 2. IPAQ (7 Questions)
-st.markdown("---")
-st.header("🚶 Physical Activity (IPAQ)")
-ci1, ci2 = st.columns(2)
-with ci1:
-    v_d = st.number_input("1. Vigorous activity days per week", 0, 7)
-    v_m = st.number_input("2. Minutes spent on vigorous activity per day", 0, 480)
-    m_d = st.number_input("3. Moderate activity days per week", 0, 7)
-    m_m = st.number_input("4. Minutes spent on moderate activity per day", 0, 480)
-with ci2:
-    w_d = st.number_input("5. Walking days per week", 0, 7)
-    w_m = st.number_input("6. Minutes spent walking per day", 0, 480)
-    s_m = st.number_input("7. Minutes spent sitting per weekday", 0, 1440, 300)
+# Styling
+st.markdown("""<style> .report-card { background-color: #f0f2f6; padding: 20px; border-radius: 10px; border-left: 5px solid #007bff; } </style>""", unsafe_allow_html=True)
 
-# Calculate MET
-met_score = (v_d * v_m * 8.0) + (m_d * m_m * 4.0) + (w_d * w_m * 3.3)
+st.title("🏥 Clinical Nutrition Assessment & Audit")
+
+# --- 1. PATIENT DEMOGRAPHICS ---
+with st.sidebar:
+    st.header("👤 Patient Profile")
+    cr_no = st.text_input("CR Number")
+    name = st.text_input("Full Name")
+    age = st.number_input("Age", 1, 100, 35)
+    gender = st.selectbox("Gender", ["Male", "Female"])
+    st.divider()
+    ht = st.number_input("Height (cm)", 100.0, 220.0, 165.0)
+    wt = st.number_input("Weight (kg)", 10.0, 200.0, 65.0)
+
+# --- 2. IPAQ PHYSICAL ACTIVITY ---
+st.header("🏃 Physical Activity (IPAQ)")
+col_i1, col_i2 = st.columns(2)
+with col_i1:
+    v_days = st.number_input("Vigorous days/week", 0, 7)
+    v_mins = st.number_input("Vigorous mins/day", 0, 480)
+    m_days = st.number_input("Moderate days/week", 0, 7)
+    m_mins = st.number_input("Moderate mins/day", 0, 480)
+with col_i2:
+    w_days = st.number_input("Walking days/week", 0, 7)
+    w_mins = st.number_input("Walking mins/day", 0, 480)
+    s_mins = st.number_input("Sitting mins/weekday", 0, 1440, 300)
+
+met_score = (v_days * v_mins * 8.0) + (m_days * m_mins * 4.0) + (w_days * w_mins * 3.3)
 pal = 1.75 if met_score >= 3000 else (1.5 if met_score >= 600 else 1.2)
-act_cat = "Active" if pal==1.75 else "Moderate" if pal==1.5 else "Sedentary"
 
-# 3. FFQ (Vertical List)
+# --- 3. FOOD FREQUENCY ---
 st.markdown("---")
-st.header("🥗 Diet Recall (FFQ)")
-st.info("Expand each category to fill frequency and portion.")
-ffq_res = {}
+st.header("🥗 FFQ Diet Recall")
+ffq_inputs = {}
 for food, meta in food_master.items():
     with st.expander(f"🍴 {food} ({meta[0]})"):
         f1, f2, f3 = st.columns(3)
-        freq = f1.number_input(f"Frequency value", 0.0, 100.0, 0.0, key=f"f_{food}")
-        per = f2.selectbox(f"Period", ["Day", "Week", "Month", "Never"], key=f"p_{food}")
-        qty = f3.number_input(f"Portion Size", 0.0, 20.0, 1.0, key=f"q_{food}")
-        ffq_res[food] = {"f": freq, "p": per, "q": qty}
+        fv = f1.number_input("Frequency", 0.0, 100.0, 0.0, key=f"f_{food}")
+        fp = f2.selectbox("Period", ["Day", "Week", "Month", "Never"], key=f"p_{food}")
+        fq = f3.number_input("Portion", 0.0, 20.0, 1.0, key=f"q_{food}")
+        ffq_inputs[food] = {"f": fv, "p": fp, "q": fq}
 
-# 4. Results
-if st.button("🏁 GENERATE REPORT"):
-    bmi = round(wt / ((ht/100)**2), 1)
+# --- 4. ACCURATE RESULTS ---
+if st.button("📊 GENERATE FINAL CLINICAL REPORT"):
+    bmi_val = round(wt / ((ht/100)**2), 1)
     
-    # Nutrient sums [Energy, Protein, Fat, Carbs, Chol, Fibre, SFA, MUFA, PUFA]
-    totals = [0.0] * 9
-    for item, d in ffq_res.items():
-        if d["p"] == "Never" or d["f"] == 0: continue
-        m = {"Day": 1, "Week": 1/7, "Month": 1/30}[d["p"]]
-        daily_g = d["f"] * m * d["q"] * food_master[item][1]
-        for i in range(9): totals[i] += daily_g * food_master[item][i+2]
+    # Calculation of Actual Intake (From Arjun Bhagat data)
+    total_in = [0.0] * 9
+    for food, data in ffq_inputs.items():
+        if data["p"] == "Never" or data["f"] == 0: continue
+        mult = {"Day": 1, "Week": 1/7, "Month": 1/30}[data["p"]]
+        daily_g = data["f"] * mult * data["q"] * food_master[food][1]
+        for i in range(9): total_in[i] += daily_g * food_master[food][i+2]
 
-    # Requirements logic
+    # Calculation of ICMR Requirement (From Feroz logic)
     bmr = (10 * wt) + (6.25 * ht) - (5 * age) + (5 if gender == "Male" else -161)
     e_req = round(bmr * pal)
-    reqs = [e_req, round(wt*0.9), round((e_req*0.25)/9), round((e_req*0.6)/4), 200, 30, 15, 20, 15]
+    p_req = round(wt * 0.9)
+    # ICMR Distribution: Fat 25%, Carb 60%, SFA 8%, MUFA 12%, PUFA 8%
+    reqs = [e_req, p_req, round((e_req*0.25)/9), round((e_req*0.6)/4), 200, 30, round(e_req*0.08/9), round(e_req*0.12/9), round(e_req*0.08/9)]
     labels = ["Energy (kcal)", "Protein (g)", "Fats (g)", "Carbs (g)", "Cholesterol (mg)", "Fibre (g)", "SFA (g)", "MUFA (g)", "PUFA (g)"]
 
-    # --- DISPLAY FINAL ANALYSIS ---
-    st.markdown("---")
-    st.header("📊 Final Clinical Analysis")
+    st.divider()
+    col_res1, col_res2 = st.columns([2, 1])
     
-    r1, r2, r3 = st.columns(3)
-    r1.metric("BMI Status", f"{bmi}", "Normal" if 18.5 < bmi < 25 else "Check")
-    r2.metric("Total MET-min/week", int(met_score))
-    r3.metric("Activity Category", act_cat)
+    with col_res1:
+        gauge_fig, risk_text = draw_bmi_gauge(bmi_val)
+        st.plotly_chart(gauge_fig)
+    
+    with col_res2:
+        st.markdown(f"""<div class="report-card"><h3>Health Summary</h3>
+            <p><b>Risk:</b> {risk_text}</p>
+            <p><b>METs:</b> {int(met_score)} per week</p>
+            <p><b>PAL Category:</b> {"Active" if pal > 1.5 else "Sedentary"}</p></div>""", unsafe_allow_html=True)
 
-    # Comparison Table
+    st.subheader("🧪 Detailed ICMR vs Actual Audit")
     res_df = pd.DataFrame({
-        "Nutrient": labels, 
-        "Requirement (R)": reqs, 
-        "Actual Intake (In)": [round(x,1) for x in totals]
+        "Nutrient": labels,
+        "Required (ICMR)": reqs,
+        "Actual Intake (In)": [round(x, 2) for x in total_in]
     })
-    res_df["Difference"] = res_df["Actual Intake (In)"] - res_df["Requirement (R)"]
+    res_df["Difference"] = res_df["Actual Intake (In)"] - res_df["Required (ICMR)"]
     st.table(res_df)
 
     # Excel Download
-    db_entry = {"Date": datetime.now().strftime("%Y-%m-%d"), "CR_No": cr_no, "Name": p_name, "BMI": bmi, "MET": met_score}
-    for i, l in enumerate(labels): db_entry[l] = round(totals[i], 1)
-    csv = pd.DataFrame([db_entry]).to_csv(index=False).encode('utf-8')
-    st.download_button("💾 Download Patient Data (Excel/CSV)", csv, f"Data_{cr_no}.csv", "text/csv")
-    
-    st.success("You can now take a screenshot of the results above to share.")
+    db_entry = {"CR": cr_no, "Name": name, "BMI": bmi_val, "MET": int(met_score)}
+    for i, l in enumerate(labels): db_entry[l] = round(total_in[i], 1)
+    st.download_button("💾 Save to Excel", pd.DataFrame([db_entry]).to_csv(index=False), f"Report_{cr_no}.csv")
