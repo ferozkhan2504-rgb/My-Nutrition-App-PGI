@@ -1,16 +1,10 @@
 import streamlit as st
 import pandas as pd
+from fpdf import FPDF
 from datetime import datetime
 
-# PDF library import with error handling
-try:
-    from fpdf import FPDF
-except ImportError:
-    # Agar library install nahi hui to app crash nahi hoga
-    st.error("PDF Library (fpdf2) not found. Please check requirements.txt")
-
-# --- FULL FOOD LIST (All 143+ items from your image) ---
-# [Unit, GramsPerUnit, Energy, Protein, Fat, Carbs, Chol, Fibre, SFA, MUFA, PUFA]
+# --- FULL FOOD & LIQUID DATABASE (143+ Items) ---
+# Format: "Item": ["Unit", GramsPerUnit, Energy, Protein, Fat, Carbs, Chol, Fibre, SFA, MUFA, PUFA]
 food_master = {
     "Chapati with ghee": ["No.", 25, 4.41, 0.138, 0.076, 0.793, 0.16, 0.021, 0.041, 0.056, 0.024],
     "Chapati dry": ["No.", 25, 3.90, 0.138, 0.019, 0.793, 0.00, 0.021, 0.003, 0.014, 0.009],
@@ -127,13 +121,13 @@ food_master = {
     "Beans": ["Tbsp", 100, 1.13, 0.024, 0.052, 0.139, 0.00, 0.006, 0.003, 0.007, 0.006],
 }
 
-# --- PDF REPORT DESIGN ---
+# --- PDF CLASS DESIGN ---
 class PDFReport(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 16)
         self.cell(0, 10, 'CLINICAL NUTRITION ASSESSMENT REPORT', 0, 1, 'C')
         self.set_font('Arial', '', 10)
-        self.cell(0, 5, f'Generated on: {datetime.now().strftime("%Y-%m-%d")}', 0, 1, 'C')
+        self.cell(0, 5, f'Generated on: {datetime.now().strftime("%Y-%m-%d %H:%M")}', 0, 1, 'C')
         self.ln(10)
 
     def patient_card(self, data):
@@ -178,7 +172,7 @@ with col_i1:
 with col_i2:
     w_days = st.number_input("5. Walking days per week", 0, 7, 0)
     w_mins = st.number_input("6. Minutes spent walking per day", 0, 480, 0)
-    s_mins = st.number_input("7. Minutes spent sitting per weekday", 0, 1440, 300)
+    s_mins = st.number_input("7. Minutes spent sitting on a weekday?", 0, 1440, 300)
 
 v_met = 8.0 * v_mins * v_days
 m_met = 4.0 * m_mins * m_days
@@ -194,18 +188,18 @@ st.caption("Input frequency and portion sizes for items below.")
 
 ffq_responses = {}
 for food, meta in food_master.items():
-    with st.expander(f"➕ {food} ({meta[0]})"):
+    with st.expander(f"🍴 {food} ({meta[0]})"):
         f_c1, f_c2, f_c3 = st.columns([2, 2, 2])
-        f_val = f_c1.number_input("Frequency", 0.0, 100.0, 0.0, key=f"f_{food}")
+        f_val = f_c1.number_input("Frequency value", 0.0, 100.0, 0.0, key=f"f_{food}")
         f_per = f_c2.selectbox("Period", ["Day", "Week", "Month", "Never"], key=f"p_{food}")
-        f_qty = f_c3.number_input(f"Portion Size", 0.0, 20.0, 1.0, key=f"q_{food}")
+        f_qty = f_c3.number_input(f"Portion Size", 0.0, 50.0, 1.0, key=f"q_{food}")
         ffq_responses[food] = {"f": f_val, "p": f_per, "q": f_qty}
 
 # --- 4. CALCULATION & REPORT ---
 if st.button("🏁 COMPLETE ASSESSMENT & GENERATE REPORT"):
     bmi = round(weight / ((height/100)**2), 1)
     
-    # Calculate Totals [Energy...PUFA]
+    # Calculate Totals [Energy, Protein, Fat, Carbs, Chol, Fibre, SFA, MUFA, PUFA]
     total_in = [0.0] * 9
     for item, res in ffq_responses.items():
         if res["p"] == "Never" or res["f"] == 0: continue
@@ -213,11 +207,19 @@ if st.button("🏁 COMPLETE ASSESSMENT & GENERATE REPORT"):
         daily_g = res["f"] * mult * res["q"] * food_master[item][1]
         for i in range(9): total_in[i] += daily_g * food_master[item][i+2]
 
-    # Requirement Logic (Feroz Style)
+    # Requirement Logic (Feroz Style - ICMR based)
     bmr = (10 * weight) + (6.25 * height) - (5 * age) + (5 if gender == "Male" else -161)
     e_req = round(bmr * pal)
     req_list = [e_req, round(weight*0.9), round((e_req*0.25)/9), round((e_req*0.6)/4), 200, 30, 15, 20, 15]
     labels = ["Energy (kcal)", "Protein (g)", "Fats (g)", "Carbs (g)", "Cholesterol (mg)", "Fibre (g)", "SFA (g)", "MUFA (g)", "PUFA (g)"]
+
+    # --- DISPLAY MET & BMI STATUS ---
+    st.markdown("---")
+    st.header("📊 Results Summary")
+    r1, r2, r3 = st.columns(3)
+    r1.metric("MET-min/week", int(total_met))
+    r2.metric("BMI", bmi)
+    r3.metric("Activity Status", act_cat)
 
     # Results Table
     df = pd.DataFrame({"Nutrient": labels, "Requirement (R)": req_list, "Actual Intake (In)": [round(x, 1) for x in total_in]})
@@ -225,7 +227,7 @@ if st.button("🏁 COMPLETE ASSESSMENT & GENERATE REPORT"):
     st.table(df)
 
     # --- SAVE TO EXCEL ---
-    db_entry = {"CR_No": cr_no, "Name": p_name, "BMI": bmi, "MET_Total": total_met}
+    db_entry = {"Date": datetime.now().strftime("%Y-%m-%d"), "CR_No": cr_no, "Name": p_name, "BMI": bmi, "MET_Total": total_met}
     for i, l in enumerate(labels): db_entry[l] = round(total_in[i], 1)
     st.download_button("💾 Save to Excel/CSV", pd.DataFrame([db_entry]).to_csv(index=False), f"{cr_no}_data.csv", "text/csv")
 
