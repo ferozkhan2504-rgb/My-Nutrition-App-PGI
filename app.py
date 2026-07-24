@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-from fpdf import FPDF
 from datetime import datetime
+from fpdf import FPDF
 
 # --- FULL FOOD & LIQUID DATABASE (143+ Items) ---
 # Format: "Item": ["Unit", GramsPerUnit, Energy, Protein, Fat, Carbs, Chol, Fibre, SFA, MUFA, PUFA]
