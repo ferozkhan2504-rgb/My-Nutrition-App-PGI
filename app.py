@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
+from fpdf import FPDF
+from datetime import datetime
 
-# --- FULL COMPREHENSIVE DATABASE (143+ Items from your Data) ---
-# Format: "Food Name": ["Unit", GramsPerUnit, Energy, Protein, Fat, Carbs, Chol, Fibre, SFA, MUFA, PUFA]
+# --- FULL FOOD LIST (All 143+ items from your image) ---
+# [Unit, GramsPerUnit, Energy, Protein, Fat, Carbs, Chol, Fibre, SFA, MUFA, PUFA]
 food_master = {
     "Chapati with ghee": ["No.", 25, 4.41, 0.138, 0.076, 0.793, 0.16, 0.021, 0.041, 0.056, 0.024],
     "Chapati dry": ["No.", 25, 3.90, 0.138, 0.019, 0.793, 0.00, 0.021, 0.003, 0.014, 0.009],
@@ -119,119 +121,117 @@ food_master = {
     "Beans": ["Tbsp", 100, 1.13, 0.024, 0.052, 0.139, 0.00, 0.006, 0.003, 0.007, 0.006],
 }
 
-# --- PDF REPORT DESIGN CLASS ---
+# --- PDF REPORT DESIGN ---
 class PDFReport(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 16)
         self.cell(0, 10, 'CLINICAL NUTRITION ASSESSMENT REPORT', 0, 1, 'C')
         self.set_font('Arial', '', 10)
-        self.cell(0, 5, f'Generated on: {datetime.now().strftime("%Y-%m-%d %H:%M")}', 0, 1, 'C')
+        self.cell(0, 5, f'Generated on: {datetime.now().strftime("%Y-%m-%d")}', 0, 1, 'C')
         self.ln(10)
 
-    def patient_info(self, data):
+    def patient_card(self, data):
         self.set_font('Arial', 'B', 12)
-        self.set_fill_color(240, 240, 240)
-        self.cell(0, 10, ' Patient Details', 0, 1, 'L', fill=True)
+        self.set_fill_color(230, 230, 230)
+        self.cell(0, 10, ' Patient Identification', 0, 1, 'L', fill=True)
         self.set_font('Arial', '', 11)
         self.cell(95, 8, f"Name: {data['name']}", 0, 0)
         self.cell(95, 8, f"CR No: {data['cr_no']}", 0, 1)
         self.cell(95, 8, f"Age: {data['age']} yrs", 0, 0)
-        self.cell(95, 8, f"Mobile: {data['mobile']}", 0, 1)
-        self.cell(95, 8, f"BMI: {data['bmi']} ({data['status']})", 0, 0)
-        self.cell(95, 8, f"Activity Level: {data['pal_cat']}", 0, 1)
-        self.ln(5)
+        self.cell(95, 8, f"BMI: {data['bmi']}", 0, 1)
+        self.cell(95, 8, f"MET-min/week: {data['met']}", 0, 0)
+        self.cell(95, 8, f"Activity Level: {data['activity']}", 0, 1)
+        self.ln(10)
 
 # --- APP LAYOUT ---
 st.set_page_config(page_title="Medical Nutrition System", layout="wide")
-st.title("🏥 Clinical Nutrition System")
+st.title("🏥 Patient Nutrition & Physical Activity Assessment")
 
-# --- 1. INPUTS (Patient, IPAQ, FFQ) ---
-col1, col2, col3, col4 = st.columns(4)
-cr_no = col1.text_input("CR Number")
-p_name = col2.text_input("Patient Name")
-mobile = col3.text_input("Mobile Number")
-age = col4.number_input("Age", 1, 100, 30)
+# --- 1. PATIENT DEMOGRAPHICS ---
+st.header("📋 Patient Demographics")
+c1, c2, c3, c4 = st.columns(4)
+cr_no = c1.text_input("CR Number")
+p_name = c2.text_input("Patient Name")
+mobile = c3.text_input("Mobile Number")
+age = c4.number_input("Age (Years)", 1, 100, 30)
 
-c1, c2, c3 = st.columns(3)
-height = c1.number_input("Height (cm)", 100.0, 250.0, 165.0)
-weight = c2.number_input("Weight (kg)", 20.0, 200.0, 60.0)
-gender = c3.selectbox("Gender", ["Male", "Female"])
+c5, c6, c7 = st.columns(3)
+height = c5.number_input("Height (cm)", 100.0, 250.0, 165.0)
+weight = c6.number_input("Weight (kg)", 10.0, 200.0, 65.0)
+gender = c7.selectbox("Gender", ["Male", "Female"])
 
-# IPAQ MET Calculation
-st.write("### IPAQ Activity")
-v_days = st.number_input("Vigorous Days", 0, 7, 0)
-v_mins = st.number_input("Vigorous Mins", 0, 480, 0)
-m_days = st.number_input("Moderate Days", 0, 7, 0)
-m_mins = st.number_input("Moderate Mins", 0, 480, 0)
-w_days = st.number_input("Walking Days", 0, 7, 0)
-w_mins = st.number_input("Walking Mins", 0, 480, 0)
+# --- 2. IPAQ (7 QUESTIONS) ---
+st.markdown("---")
+st.header("🚶 Physical Activity (IPAQ)")
+col_i1, col_i2 = st.columns(2)
+with col_i1:
+    v_days = st.number_input("1. Vigorous activity days per week", 0, 7, 0)
+    v_mins = st.number_input("2. Minutes on vigorous activity per day", 0, 480, 0)
+    m_days = st.number_input("3. Moderate activity days per week", 0, 7, 0)
+    m_mins = st.number_input("4. Minutes on moderate activity per day", 0, 480, 0)
+with col_i2:
+    w_days = st.number_input("5. Walking days per week", 0, 7, 0)
+    w_mins = st.number_input("6. Minutes spent walking per day", 0, 480, 0)
+    s_mins = st.number_input("7. Minutes spent sitting per weekday", 0, 1440, 300)
 
-total_met = (v_days * v_mins * 8.0) + (m_days * m_mins * 4.0) + (w_days * w_mins * 3.3)
+v_met = 8.0 * v_mins * v_days
+m_met = 4.0 * m_mins * m_days
+w_met = 3.3 * w_mins * w_days
+total_met = v_met + m_met + w_met
 pal = 1.75 if total_met >= 3000 else (1.5 if total_met >= 600 else 1.2)
+act_cat = "Active" if pal==1.75 else "Moderate" if pal==1.5 else "Sedentary"
 
-# BMI calculation
-bmi = round(weight / ((height/100)**2), 1)
-status = "Normal" if 18.5 < bmi < 24.9 else "Over/Under"
+# --- 3. FFQ (ALL 143+ ITEMS LINE BY LINE) ---
+st.markdown("---")
+st.header("🥗 Daily Food Recall")
+st.caption("Input frequency and portion sizes for items below.")
 
-# --- 2. DIET RECALL ---
-st.write("### Diet Intake")
-if 'basket' not in st.session_state: st.session_state.basket = []
-selected_food = st.selectbox("Select Food", [""] + list(food_master.keys()))
-if selected_food:
-    f_val = st.number_input("Frequency", 0.0, 100.0, 1.0)
-    f_unit = st.selectbox("Per", ["Day", "Week", "Month"])
-    f_qty = st.number_input("Portion Size", 0.5, 20.0, 1.0)
-    if st.button("Add Item"):
-        st.session_state.basket.append({"item": selected_food, "f": f_val, "p": f_unit, "q": f_qty})
+ffq_responses = {}
+for food, meta in food_master.items():
+    with st.expander(f"➕ {food} ({meta[0]})"):
+        f_c1, f_c2, f_c3 = st.columns([2, 2, 2])
+        f_val = f_c1.number_input("Frequency", 0.0, 100.0, 0.0, key=f"f_{food}")
+        f_per = f_c2.selectbox("Period", ["Day", "Week", "Month", "Never"], key=f"p_{food}")
+        f_qty = f_c3.number_input(f"Portion Size", 0.0, 20.0, 1.0, key=f"q_{food}")
+        ffq_responses[food] = {"f": f_val, "p": f_per, "q": f_qty}
 
-# --- 3. RESULTS & EXPORT ---
-if st.button("🏁 COMPLETE ASSESSMENT"):
-    # Nutrient Calculation Logic
-    totals = [0.0] * 9
-    for entry in st.session_state.basket:
-        mult = {"Day": 1, "Week": 1/7, "Month": 1/30}[entry["p"]]
-        daily_g = entry["f"] * mult * entry["q"] * food_master[entry["item"]][1]
-        for i in range(9): totals[i] += daily_g * food_master[entry["item"]][i+2]
-
-    # Requirement Logic
-    bmr = (10 * weight) + (6.25 * height) - (5 * age) + (5 if gender == "Male" else -161)
-    req_list = [round(bmr * pal), round(weight*0.9), round((bmr*pal*0.25)/9), round((bmr*pal*0.6)/4), 200, 30, 15, 20, 15]
-    labels = ["Energy", "Protein", "Fats", "Carbs", "Chol", "Fibre", "SFA", "MUFA", "PUFA"]
-
-    # --- SAVE TO EXCEL DATABASE ---
-    db_entry = {
-        "Date": datetime.now().strftime("%Y-%m-%d"),
-        "CR_No": cr_no, "Name": p_name, "Age": age, "Mobile": mobile, "BMI": bmi, "MET": total_met
-    }
-    for i, label in enumerate(labels):
-        db_entry[f"{label}_Req"] = req_list[i]
-        db_entry[f"{label}_Intake"] = round(totals[i], 1)
+# --- 4. CALCULATION & REPORT ---
+if st.button("🏁 COMPLETE ASSESSMENT & GENERATE REPORT"):
+    bmi = round(weight / ((height/100)**2), 1)
     
-    # Save/Append to CSV (Excel compatible)
-    new_data = pd.DataFrame([db_entry])
-    st.write("### ✅ Data Saved to Clinical Database")
-    st.download_button("Download All Records (Excel)", new_data.to_csv(index=False), "clinical_database.csv", "text/csv")
+    # Calculate Totals [Energy...PUFA]
+    total_in = [0.0] * 9
+    for item, res in ffq_responses.items():
+        if res["p"] == "Never" or res["f"] == 0: continue
+        mult = {"Day": 1, "Week": 1/7, "Month": 1/30}[res["p"]]
+        daily_g = res["f"] * mult * res["q"] * food_master[item][1]
+        for i in range(9): total_in[i] += daily_g * food_master[item][i+2]
 
-    # --- GENERATE PDF REPORT ---
+    # Requirement Logic (Feroz Style)
+    bmr = (10 * weight) + (6.25 * height) - (5 * age) + (5 if gender == "Male" else -161)
+    e_req = round(bmr * pal)
+    req_list = [e_req, round(weight*0.9), round((e_req*0.25)/9), round((e_req*0.6)/4), 200, 30, 15, 20, 15]
+    labels = ["Energy (kcal)", "Protein (g)", "Fats (g)", "Carbs (g)", "Cholesterol (mg)", "Fibre (g)", "SFA (g)", "MUFA (g)", "PUFA (g)"]
+
+    # Results Table
+    df = pd.DataFrame({"Nutrient": labels, "Requirement (R)": req_list, "Actual Intake (In)": [round(x, 1) for x in total_in]})
+    df["Difference"] = df["Actual Intake (In)"] - df["Requirement (R)"]
+    st.table(df)
+
+    # --- SAVE TO EXCEL ---
+    db_entry = {"CR_No": cr_no, "Name": p_name, "BMI": bmi, "MET_Total": total_met}
+    for i, l in enumerate(labels): db_entry[l] = round(total_in[i], 1)
+    st.download_button("💾 Save to Excel/CSV", pd.DataFrame([db_entry]).to_csv(index=False), f"{cr_no}_data.csv", "text/csv")
+
+    # --- PDF REPORT ---
     pdf = PDFReport()
     pdf.add_page()
-    pdf.patient_info({'name': p_name, 'cr_no': cr_no, 'age': age, 'mobile': mobile, 'bmi': bmi, 'status': status, 'pal_cat': 'Active' if pal > 1.5 else 'Sedentary'})
-    
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, ' Nutrient Comparison', 0, 1, 'L', fill=True)
+    pdf.patient_card({'name': p_name, 'cr_no': cr_no, 'age': age, 'bmi': bmi, 'met': int(total_met), 'activity': act_cat})
     pdf.set_font('Arial', 'B', 10)
-    pdf.cell(50, 10, 'Parameter', 1)
-    pdf.cell(50, 10, 'Requirement (R)', 1)
-    pdf.cell(50, 10, 'Actual Intake (In)', 1)
-    pdf.cell(40, 10, 'Status', 1, 1)
-    
+    pdf.cell(50, 10, 'Nutrient', 1); pdf.cell(50, 10, 'Req (R)', 1); pdf.cell(50, 10, 'Intake (In)', 1); pdf.cell(30, 10, 'Status', 1, 1)
     pdf.set_font('Arial', '', 10)
     for i, label in enumerate(labels):
-        pdf.cell(50, 10, label, 1)
-        pdf.cell(50, 10, str(req_list[i]), 1)
-        pdf.cell(50, 10, str(round(totals[i], 1)), 1)
-        status_txt = "Met" if totals[i] >= req_list[i] else "Low"
-        pdf.cell(40, 10, status_txt, 1, 1)
-
-    pdf_output = pdf.output(dest='S').encode('latin-1')
-    st.download_button(label="📄 Download Patient Report (PDF)", data=pdf_output, file_name=f"Report_{cr_no}.pdf", mime="application/pdf")
+        pdf.cell(50, 10, label, 1); pdf.cell(50, 10, str(req_list[i]), 1); pdf.cell(50, 10, str(round(total_in[i],1)), 1)
+        pdf.cell(30, 10, "Met" if total_in[i] >= req_list[i] else "Low", 1, 1)
+    
+    st.download_button("📄 Download PDF Report", pdf.output(dest='S').encode('latin-1'), f"Report_{cr_no}.pdf", "application/pdf")
